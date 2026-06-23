@@ -25,7 +25,6 @@ env/
 
 # uv
 .python-version
-uv.lock
 
 # Testing & coverage
 .pytest_cache/
