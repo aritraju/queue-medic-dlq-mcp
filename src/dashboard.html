@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Queue Medic — Dashboard</title>
+  <style>
+    :root {
+      --bg:        #0f172a;
+      --surface:   #1e293b;
+      --surface2:  #293548;
+      --border:    #334155;
+      --primary:   #3b82f6;
+      --success:   #10b981;
+      --warning:   #f59e0b;
+      --error:     #ef4444;
+      --purple:    #8b5cf6;
+      --text:      #e2e8f0;
+      --muted:     #94a3b8;
+      --radius:    8px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 10;
+    }
+    .logo { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -.3px; }
+    .logo span { color: var(--primary); }
+    .header-right { display: flex; align-items: center; gap: 20px; }
+    .live-dot {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--success);
+    }
+    .live-dot::before {
+      content: "";
+      width: 8px; height: 8px;
+      background: var(--success);
+      border-radius: 50%;
+      animation: pulse 1.8s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: .35; }
+    }
+    .agent-status {
+      display: flex; align-items: center; gap: 6px;
+      padding: 4px 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 11px;
+      color: var(--muted);
+      transition: all .3s;
+    }
+    .agent-status.healing {
+      border-color: var(--purple);
+      color: #c4b5fd;
+      animation: glow 1.5s ease-in-out infinite;
+    }
+    @keyframes glow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(139,92,246,0); }
+      50%       { box-shadow: 0 0 12px 2px rgba(139,92,246,.3); }
+    }
+    .agent-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+      transition: background .3s;
+    }
+    .healing .agent-dot { background: var(--purple); animation: pulse 1s infinite; }
+    #clock { color: var(--muted); font-size: 12px; }
+
+    /* ── Stat cards ─────────────────────────────────────────────── */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      padding: 16px 24px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text);
+      transition: color .4s;
+    }
+    .stat-value.flash { color: var(--primary); }
+    .stat-card.success .stat-value { color: var(--success); }
+    .stat-card.warning .stat-value { color: var(--warning); }
+    .stat-card.error   .stat-value { color: var(--error); }
+
+    /* ── Main grid ──────────────────────────────────────────────── */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 12px;
+      padding: 0 24px 12px;
+    }
+
+    /* ── Panel base ─────────────────────────────────────────────── */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .panel-body { padding: 16px; flex: 1; overflow: auto; }
+
+    /* ── Trigger panel ──────────────────────────────────────────── */
+    .preset-row { display: flex; gap: 8px; margin-bottom: 12px; }
+    .preset-btn {
+      flex: 1;
+      padding: 7px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 11px;
+      font-family: inherit;
+      transition: all .15s;
+    }
+    .preset-btn:hover  { border-color: var(--primary); color: #93c5fd; }
+    .preset-btn.active { border-color: var(--primary); background: rgba(59,130,246,.15); color: #93c5fd; }
+    .preset-btn.v2:hover,
+    .preset-btn.v2.active { border-color: var(--error); color: #fca5a5; background: rgba(239,68,68,.1); }
+
+    .label { font-size: 11px; color: var(--muted); margin-bottom: 5px; }
+    textarea#payload-editor {
+      width: 100%;
+      height: 158px;
+      background: #0f172a;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: #7dd3fc;
+      font-family: inherit;
+      font-size: 12px;
+      padding: 10px;
+      resize: vertical;
+      outline: none;
+      transition: border-color .2s;
+    }
+    textarea#payload-editor:focus { border-color: var(--primary); }
+
+    .send-row { display: flex; gap: 8px; margin-top: 10px; align-items: center; }
+    #send-btn {
+      padding: 8px 20px;
+      background: var(--primary);
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      transition: background .15s, opacity .15s;
+    }
+    #send-btn:hover    { background: #2563eb; }
+    #send-btn:disabled { opacity: .5; cursor: not-allowed; }
+    #send-spinner { display: none; color: var(--muted); font-size: 11px; }
+
+    .response-box {
+      margin-top: 12px;
+      padding: 10px;
+      background: #0f172a;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 11px;
+      color: var(--muted);
+      min-height: 40px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .response-box.ok    { border-color: var(--success); color: #6ee7b7; }
+    .response-box.error { border-color: var(--error);   color: #fca5a5; }
+
+    /* ── Live Log panel ─────────────────────────────────────────── */
+    .log-panel { height: 360px; }
+    .log-panel .panel-body {
+      padding: 0;
+      display: flex;
+      flex-direction: column-reverse;   /* newest at bottom */
+      overflow-y: auto;
+    }
+    #log-stream {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      padding: 8px 0;
+    }
+    .log-entry {
+      display: grid;
+      grid-template-columns: 60px 100px 64px 1fr;
+      gap: 8px;
+      padding: 3px 12px;
+      font-size: 11.5px;
+      line-height: 1.45;
+      animation: slide-in .18s ease-out;
+      border-bottom: 1px solid rgba(51,65,85,.4);
+    }
+    .log-entry:last-child { border-bottom: none; }
+    @keyframes slide-in {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .log-ts   { color: #475569; }
+    .log-name { color: #7dd3fc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .log-badge {
+      border-radius: 4px;
+      padding: 0 5px;
+      text-align: center;
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1.6;
+    }
+    .badge-INFO    { background: rgba(59,130,246,.2);  color: #93c5fd; }
+    .badge-WARNING { background: rgba(245,158,11,.2);  color: #fcd34d; }
+    .badge-ERROR   { background: rgba(239,68,68,.2);   color: #fca5a5; }
+    .badge-DEBUG   { background: rgba(71,85,105,.2);   color: #64748b; }
+    .log-msg-INFO    { color: #cbd5e1; }
+    .log-msg-WARNING { color: #fcd34d; }
+    .log-msg-ERROR   { color: #fca5a5; }
+    .log-msg-DEBUG   { color: #475569; }
+    .log-empty { padding: 24px 16px; color: var(--muted); text-align: center; font-size: 12px; }
+
+    /* ── Data tables section ────────────────────────────────────── */
+    .tables-section { padding: 0 24px 24px; }
+    .tab-bar {
+      display: flex;
+      gap: 2px;
+      margin-bottom: -1px;
+      position: relative;
+      z-index: 1;
+    }
+    .tab-btn {
+      padding: 8px 18px;
+      border: 1px solid var(--border);
+      border-bottom: none;
+      border-radius: 6px 6px 0 0;
+      background: var(--bg);
+      color: var(--muted);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 12px;
+      transition: all .15s;
+    }
+    .tab-btn.active { background: var(--surface); color: var(--text); border-bottom-color: var(--surface); }
+    .tab-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 0 var(--radius) var(--radius) var(--radius);
+      overflow: auto;
+      max-height: 280px;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      position: sticky; top: 0;
+      background: var(--surface);
+    }
+    tbody tr { border-bottom: 1px solid rgba(51,65,85,.5); transition: background .1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--surface2); }
+    tbody td { padding: 9px 14px; font-size: 12px; color: var(--text); }
+    .empty-row td { color: var(--muted); text-align: center; padding: 24px; }
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 10.5px;
+      font-weight: 600;
+    }
+    .pill-healed  { background: rgba(16,185,129,.15); color: #6ee7b7; }
+    .pill-pending { background: rgba(245,158,11,.15);  color: #fcd34d; }
+    .pill-failed  { background: rgba(239,68,68,.15);   color: #fca5a5; }
+    .pill-purchase { background: rgba(59,130,246,.15); color: #93c5fd; }
+    .pill-checkout { background: rgba(139,92,246,.15); color: #c4b5fd; }
+    .pill-view     { background: rgba(16,185,129,.15); color: #6ee7b7; }
+    .monoid { font-family: inherit; font-size: 11px; color: var(--muted); }
+    .amount { color: var(--success); }
+    .refresh-note { float: right; font-size: 10px; color: var(--muted); }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ───────────────────────────────────────────────────────── -->
+<header>
+  <div class="logo">⚕ Queue <span>Medic</span></div>
+  <div class="header-right">
+    <div id="agent-status" class="agent-status">
+      <span class="agent-dot"></span>
+      <span id="agent-label">Agent Idle</span>
+    </div>
+    <div class="live-dot">LIVE</div>
+    <div id="clock">—</div>
+  </div>
+</header>
+
+<!-- ── Stat cards ────────────────────────────────────────────────────── -->
+<div class="stats">
+  <div class="stat-card success">
+    <div class="stat-label">Events Ingested</div>
+    <div class="stat-value" id="stat-events">—</div>
+  </div>
+  <div class="stat-card success">
+    <div class="stat-label">Messages Healed</div>
+    <div class="stat-value" id="stat-healed">—</div>
+  </div>
+  <div class="stat-card warning">
+    <div class="stat-label">In DLQ (Pending)</div>
+    <div class="stat-value" id="stat-pending">—</div>
+  </div>
+  <div class="stat-card error">
+    <div class="stat-label">Heal Failures</div>
+    <div class="stat-value" id="stat-failures">—</div>
+  </div>
+</div>
+
+<!-- ── Main grid ─────────────────────────────────────────────────────── -->
+<div class="main-grid">
+
+  <!-- Trigger panel -->
+  <div class="panel">
+    <div class="panel-header">
+      Trigger Events
+      <span id="last-sent" style="color:var(--muted);font-size:10px;font-weight:400">No events sent yet</span>
+    </div>
+    <div class="panel-body">
+      <div class="label">Preset payloads</div>
+      <div class="preset-row">
+        <button class="preset-btn active" id="preset-v1" onclick="loadPreset('v1')">✓ Valid v1 Event</button>
+        <button class="preset-btn v2"     id="preset-v2" onclick="loadPreset('v2')">✗ Broken v2 Event</button>
+      </div>
+
+      <div class="label" style="margin-top:12px">JSON Payload (editable)</div>
+      <textarea id="payload-editor" spellcheck="false"></textarea>
+
+      <div class="send-row">
+        <button id="send-btn" onclick="sendPayload()">Send Event →</button>
+        <span id="send-spinner">sending…</span>
+      </div>
+
+      <div class="label" style="margin-top:14px">Response</div>
+      <div class="response-box" id="response-box">Awaiting first event…</div>
+    </div>
+  </div>
+
+  <!-- Live log panel -->
+  <div class="panel log-panel">
+    <div class="panel-header">
+      Live Agent Log
+      <span>
+        <button onclick="clearLog()" style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;font-size:10px;font-family:inherit;padding:2px 8px">Clear</button>
+      </span>
+    </div>
+    <div class="panel-body">
+      <div id="log-stream">
+        <div class="log-empty">Waiting for events… Send a payload to see the agent in action.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Data tables ────────────────────────────────────────────────────── -->
+<div class="tables-section">
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('events')">Events Table</button>
+    <button class="tab-btn"        onclick="switchTab('audit')">Healing Audit</button>
+  </div>
+  <div class="tab-panel">
+    <div id="tab-events">
+      <table>
+        <thead>
+          <tr>
+            <th>Event ID</th>
+            <th>User ID</th>
+            <th>Amount</th>
+            <th>Timestamp</th>
+            <th>Type</th>
+            <th>Ingested At <span class="refresh-note">auto-refresh 3s</span></th>
+          </tr>
+        </thead>
+        <tbody id="events-tbody">
+          <tr class="empty-row"><td colspan="6">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="tab-audit" style="display:none">
+      <table>
+        <thead>
+          <tr>
+            <th>Event ID</th>
+            <th>Failed Message ID</th>
+            <th>Status</th>
+            <th>Healed At <span class="refresh-note">auto-refresh 5s</span></th>
+          </tr>
+        </thead>
+        <tbody id="audit-tbody">
+          <tr class="empty-row"><td colspan="4">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── Preset payloads ─────────────────────────────────────────────────── */
+const PRESETS = {
+  v1: {
+    event_id:   crypto.randomUUID(),
+    user_id:    Math.floor(Math.random() * 900) + 100,
+    amount:     parseFloat((Math.random() * 500 + 10).toFixed(2)),
+    timestamp:  new Date().toISOString().replace('Z', ''),
+    event_type: ['purchase','checkout','view'][Math.floor(Math.random()*3)]
+  },
+  v2: {
+    event_id:   crypto.randomUUID(),
+    user_id:    `usr_${Math.floor(Math.random() * 900) + 100}`,
+    payload:    { amount: parseFloat((Math.random() * 500 + 10).toFixed(2)), currency: 'USD' },
+    ts:         new Date().toISOString().replace('Z', ''),
+    event_type: ['purchase','checkout','view'][Math.floor(Math.random()*3)]
+  }
+};
+
+let activePreset = 'v1';
+
+function loadPreset(type) {
+  activePreset = type;
+  // Regenerate random values each time
+  if (type === 'v1') {
+    PRESETS.v1 = { ...PRESETS.v1, event_id: crypto.randomUUID(), user_id: Math.floor(Math.random()*900)+100, amount: parseFloat((Math.random()*500+10).toFixed(2)) };
+  } else {
+    PRESETS.v2 = { ...PRESETS.v2, event_id: crypto.randomUUID(), user_id: `usr_${Math.floor(Math.random()*900)+100}`, payload: { amount: parseFloat((Math.random()*500+10).toFixed(2)), currency: 'USD' } };
+  }
+  document.getElementById('payload-editor').value = JSON.stringify(PRESETS[type], null, 2);
+  document.getElementById('preset-v1').classList.toggle('active', type === 'v1');
+  document.getElementById('preset-v2').classList.toggle('active', type === 'v2');
+}
+
+loadPreset('v1');
+
+/* ── Send event ──────────────────────────────────────────────────────── */
+async function sendPayload() {
+  const rawText = document.getElementById('payload-editor').value.trim();
+  let payload;
+  try { payload = JSON.parse(rawText); }
+  catch(e) {
+    setResponse(`JSON parse error: ${e.message}`, 'error');
+    return;
+  }
+
+  const btn = document.getElementById('send-btn');
+  const spinner = document.getElementById('send-spinner');
+  btn.disabled = true;
+  spinner.style.display = 'inline';
+  setResponse('Sending…', '');
+
+  try {
+    const res = await fetch('/ingest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    setResponse(JSON.stringify(data, null, 2), res.ok ? 'ok' : 'error');
+    document.getElementById('last-sent').textContent =
+      `Last sent: ${new Date().toLocaleTimeString()} — ${activePreset === 'v2' ? '⚕ healing expected' : '✓ valid'}`;
+    if (activePreset === 'v2') setAgentHealing(true);
+  } catch(e) {
+    setResponse(`Network error: ${e.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    spinner.style.display = 'none';
+    // Refresh a new random preset
+    loadPreset(activePreset);
+  }
+}
+
+function setResponse(text, cls) {
+  const box = document.getElementById('response-box');
+  box.textContent = text;
+  box.className = `response-box ${cls}`;
+}
+
+/* ── Agent status indicator ──────────────────────────────────────────── */
+let healingTimer = null;
+function setAgentHealing(on) {
+  const el = document.getElementById('agent-status');
+  const lbl = document.getElementById('agent-label');
+  if (on) {
+    el.classList.add('healing');
+    lbl.textContent = 'Agent Healing…';
+    clearTimeout(healingTimer);
+    healingTimer = setTimeout(() => setAgentHealing(false), 45_000);
+  } else {
+    el.classList.remove('healing');
+    lbl.textContent = 'Agent Idle';
+  }
+}
+
+/* ── Live log SSE ─────────────────────────────────────────────────────── */
+let logCount = 0;
+const MAX_LOG = 120;
+
+function appendLog(entry) {
+  const stream = document.getElementById('log-stream');
+
+  // Remove placeholder
+  const empty = stream.querySelector('.log-empty');
+  if (empty) empty.remove();
+
+  const ts = new Date(entry.ts * 1000).toLocaleTimeString('en-GB', { hour12: false });
+  const div = document.createElement('div');
+  div.className = 'log-entry';
+  div.innerHTML = `
+    <span class="log-ts">${ts}</span>
+    <span class="log-name">${escHtml(entry.name)}</span>
+    <span class="log-badge badge-${entry.level}">${entry.level}</span>
+    <span class="log-msg-${entry.level}">${escHtml(entry.msg)}</span>
+  `;
+  stream.appendChild(div);
+
+  // Auto-detect healing done
+  if (entry.msg.includes('healed and committed') || entry.msg.includes('Healing complete')) {
+    setAgentHealing(false);
+  }
+
+  // Trim old entries
+  logCount++;
+  if (logCount > MAX_LOG) {
+    const entries = stream.querySelectorAll('.log-entry');
+    if (entries.length > MAX_LOG) entries[0].remove();
+  }
+
+  // Scroll to bottom
+  const panel = stream.closest('.panel-body');
+  if (panel) panel.scrollTop = panel.scrollHeight;
+}
+
+function clearLog() {
+  const stream = document.getElementById('log-stream');
+  stream.innerHTML = '<div class="log-empty">Log cleared. Waiting for next event…</div>';
+  logCount = 0;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function connectSSE() {
+  const es = new EventSource('/stream/logs');
+  es.addEventListener('log', e => {
+    try { appendLog(JSON.parse(e.data)); } catch(_) {}
+  });
+  es.onerror = () => {
+    setTimeout(connectSSE, 3000);
+    es.close();
+  };
+}
+connectSSE();
+
+/* ── Stats polling ───────────────────────────────────────────────────── */
+const prevStats = {};
+async function refreshStats() {
+  try {
+    const res = await fetch('/api/stats');
+    const data = await res.json();
+    updateStat('stat-events',   data.events);
+    updateStat('stat-healed',   data.healed);
+    updateStat('stat-pending',  data.pending);
+    updateStat('stat-failures', data.failures);
+  } catch(_) {}
+}
+function updateStat(id, val) {
+  const el = document.getElementById(id);
+  if (el && el.textContent !== String(val)) {
+    el.textContent = val;
+    el.classList.add('flash');
+    setTimeout(() => el.classList.remove('flash'), 600);
+  }
+}
+refreshStats();
+setInterval(refreshStats, 3000);
+
+/* ── Events table ────────────────────────────────────────────────────── */
+async function refreshEvents() {
+  try {
+    const res = await fetch('/events?limit=30');
+    const data = await res.json();
+    const tbody = document.getElementById('events-tbody');
+    if (!data.events?.length) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No events yet — send a v1 payload to get started.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.events.map(e => `
+      <tr>
+        <td class="monoid">${escHtml(e.event_id)}</td>
+        <td>${e.user_id}</td>
+        <td class="amount">$${parseFloat(e.amount).toFixed(2)}</td>
+        <td class="monoid">${escHtml(e.timestamp?.split('.')[0] ?? '—')}</td>
+        <td><span class="pill pill-${e.event_type}">${escHtml(e.event_type)}</span></td>
+        <td class="monoid">${escHtml(e.ingested_at?.split('.')[0] ?? '—')}</td>
+      </tr>
+    `).join('');
+  } catch(_) {}
+}
+refreshEvents();
+setInterval(refreshEvents, 3000);
+
+/* ── Audit table ─────────────────────────────────────────────────────── */
+async function refreshAudit() {
+  try {
+    const res = await fetch('/audit?limit=20');
+    const data = await res.json();
+    const tbody = document.getElementById('audit-tbody');
+    if (!data.entries?.length) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="4">No healing events yet — send a broken v2 payload to trigger the agent.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.entries.map(e => `
+      <tr>
+        <td class="monoid">${escHtml(e.event_id)}</td>
+        <td class="monoid" style="font-size:10px;color:var(--muted)">${escHtml(e.failed_message_id)}</td>
+        <td><span class="pill pill-${e.status}">${escHtml(e.status)}</span></td>
+        <td class="monoid">${escHtml(e.healed_at?.split('.')[0] ?? '—')}</td>
+      </tr>
+    `).join('');
+  } catch(_) {}
+}
+refreshAudit();
+setInterval(refreshAudit, 5000);
+
+/* ── Tabs ─────────────────────────────────────────────────────────────── */
+function switchTab(name) {
+  document.getElementById('tab-events').style.display = name === 'events' ? '' : 'none';
+  document.getElementById('tab-audit').style.display  = name === 'audit'  ? '' : 'none';
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    b.classList.toggle('active', (i === 0 && name === 'events') || (i === 1 && name === 'audit'));
+  });
+  if (name === 'audit') refreshAudit();
+}
+
+/* ── Clock ────────────────────────────────────────────────────────────── */
+function tick() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('en-GB', { hour12: false });
+}
+tick();
+setInterval(tick, 1000);
+</script>
+</body>
+</html>
